@@ -478,7 +478,7 @@ ORDER BY avg_sale_per_customer DESC,
 # Tools Used
 
 * MySQL
-* SQL
+* POWER BI
 * GitHub
 
 # Author
