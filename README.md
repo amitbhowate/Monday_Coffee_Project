@@ -481,13 +481,6 @@ ORDER BY avg_sale_per_customer DESC,
 * POWER BI
 * GitHub
 
-# Author
-
-Your Name
-
-
-
-
 ---
 
 ## 📈 Key Insights
