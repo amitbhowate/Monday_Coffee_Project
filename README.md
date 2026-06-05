@@ -19,44 +19,20 @@ The analysis leverages historical sales data and city-level demographics to reco
 
 ## 📊 Business Questions Addressed
 
-### Q1. Coffee Consumer Count
+# ☕ Coffee Sales Analysis Using SQL
 
-Estimate the number of coffee consumers in each city assuming **25% of the population consumes coffee**.
+## Project Overview
 
-### Q2. Total Revenue from Coffee Sales
-
-Calculate the total revenue generated from coffee sales across all cities during the **last quarter of 2023**.
-
-### Q3. Product Sales Volume
-
-Determine the total number of units sold for each coffee product.
-
-### Q4. Average Sales Amount per City
-
-Analyze the average sales amount spent by customers in each city.
-
-### Q5. Top-Selling Products by City
-
-Identify the top three products in each city based on sales volume.
-
-### Q6. Customer Segmentation by City
-
-Calculate the number of unique customers purchasing coffee products in each city.
-
-### Q7. Monthly Sales Growth
-
-Measure month-over-month sales growth and decline rates across cities.
+This project analyzes coffee sales data across multiple cities to uncover insights related to revenue, customer behavior, product performance, and market opportunities. SQL was used to perform Exploratory Data Analysis (EDA) and answer key business questions.
 
 ---
 
-## 🛠️ Tools & Technologies
+# Database Tables
 
-
-* MySQL 
-* Power BI / 
-* GitHub
-
----
+* **Sales** – Transaction details
+* **Customer** – Customer information
+* **Product** – Product catalog
+* **City** – City demographics and market information
 
 ## 📂 Dataset Overview
 
@@ -66,18 +42,19 @@ The analysis is based on the following datasets:
 
 Contains city-level information such as:
 
-* City Name
+* City ID
 * Population
 * Estimated Rent
-* City Tier
+* City Name
+* Rank
 
 ### Customer Table
 
 Contains:
 
 * Customer ID
-* Customer Location
-* Registration Information
+* Customer Name
+* City ID
 
 ### Product Table
 
@@ -85,7 +62,6 @@ Contains:
 
 * Product ID
 * Product Name
-* Product Category
 * Price
 
 ### Sales Table
@@ -95,9 +71,422 @@ Contains:
 * Sale ID
 * Customer ID
 * Product ID
-* Quantity Sold
+* Rating
 * Sale Amount
 * Sale Date
+
+  ### Date Table Created With the help of DAX
+
+  * Date
+  * Month
+  * Year
+  * Month Name
+
+# Exploratory Data Analysis (EDA)
+
+## 1. City-wise Total Sales
+
+### Query
+
+```sql
+SELECT
+    ci.city_name,
+    SUM(s.total) AS Total_sale
+FROM Sales s
+INNER JOIN Customer c
+    ON s.customer_id = c.customer_id
+INNER JOIN City ci
+    ON ci.city_id = c.city_id
+GROUP BY ci.city_name
+ORDER BY Total_sale DESC;
+```
+
+---
+
+## 2. Total Customers
+
+### Query
+
+```sql
+SELECT COUNT(customer_id) AS Total_Customer
+FROM Customer;
+```
+
+### Result
+
+* Total Customers = 497
+
+---
+
+## 3. Total Revenue
+
+### Query
+
+```sql
+SELECT SUM(total) AS Total_Sale
+FROM Sales;
+```
+
+### Result
+
+* Total Revenue = ₹6,070,190
+
+---
+
+## 4. Top 10 Highest Priced Products
+
+### Query
+
+```sql
+SELECT
+    product_name,
+    SUM(price) AS price
+FROM Product
+GROUP BY product_name
+ORDER BY price DESC
+LIMIT 10;
+```
+
+---
+
+## 5. Top Ranked Cities
+
+### Query
+
+```sql
+SELECT *
+FROM City
+ORDER BY city_rank ASC
+LIMIT 5;
+```
+
+---
+
+## 6. Population Analysis
+
+### Query
+
+```sql
+SELECT
+    city_name,
+    population
+FROM City
+ORDER BY population DESC;
+```
+
+### Insight
+
+* Delhi is the most populated city.
+
+---
+
+# Business Questions
+
+## Q1. Estimated Coffee Consumers by City
+
+Assuming 25% of the population consumes coffee.
+
+### Query
+
+```sql
+SELECT
+    city_name,
+    ROUND(population * 0.25 / 1000000, 2)
+        AS coffee_consumers_in_million
+FROM City
+ORDER BY coffee_consumers_in_million DESC;
+```
+
+---
+
+## Q2. Revenue Generated in Q4 2023
+
+### Query
+
+```sql
+SELECT
+    ci.city_name,
+    YEAR(s.sale_date) AS years,
+    QUARTER(s.sale_date) AS quarters,
+    SUM(s.total) AS total_sale
+FROM Sales s
+INNER JOIN Customer c
+    ON s.customer_id = c.customer_id
+INNER JOIN City ci
+    ON ci.city_id = c.city_id
+WHERE YEAR(s.sale_date) = 2023
+  AND QUARTER(s.sale_date) = 4
+GROUP BY ci.city_name, years, quarters
+ORDER BY total_sale DESC;
+```
+
+---
+
+## Q3. Sales Count for Each Product
+
+### Query
+
+```sql
+SELECT
+    p.product_name,
+    COUNT(s.product_id) AS qty_ordered
+FROM Sales s
+INNER JOIN Product p
+    ON s.product_id = p.product_id
+GROUP BY p.product_name
+ORDER BY qty_ordered DESC;
+```
+
+---
+
+## Q4. Average Sales Amount per Customer by City
+
+### Query
+
+```sql
+SELECT
+    ci.city_name,
+    SUM(s.total) /
+    COUNT(DISTINCT c.customer_id)
+    AS average_sale_per_customer
+FROM Customer c
+INNER JOIN Sales s
+    ON c.customer_id = s.customer_id
+INNER JOIN City ci
+    ON ci.city_id = c.city_id
+GROUP BY ci.city_name
+ORDER BY average_sale_per_customer DESC;
+```
+
+---
+
+## Q5. Top 3 Selling Products by City
+
+### Query
+
+```sql
+WITH CTE AS
+(
+    SELECT
+        ci.city_name,
+        p.product_name,
+        SUM(s.total) AS total_sale,
+        DENSE_RANK() OVER
+        (
+            PARTITION BY ci.city_name
+            ORDER BY SUM(s.total) DESC
+        ) AS ranks
+    FROM Sales s
+    INNER JOIN Customer c
+        ON s.customer_id = c.customer_id
+    INNER JOIN Product p
+        ON p.product_id = s.product_id
+    INNER JOIN City ci
+        ON ci.city_id = c.city_id
+    GROUP BY ci.city_name,
+             p.product_name
+)
+
+SELECT *
+FROM CTE
+WHERE ranks <= 3;
+```
+
+---
+
+## Q6. Monthly Sales Trend for Ground Espresso Coffee (250g)
+
+### Query
+
+```sql
+SELECT
+    MONTH(sale_date) AS months,
+    SUM(s.total) AS total_sales,
+    p.product_name
+FROM Sales s
+INNER JOIN Product p
+    ON s.product_id = p.product_id
+WHERE p.product_name =
+'Ground Espresso Coffee (250g)'
+GROUP BY MONTH(sale_date),
+         p.product_name
+ORDER BY months;
+```
+
+---
+
+## Q7. Customer Segmentation by City
+
+Unique customers who purchased coffee products.
+
+### Query
+
+```sql
+SELECT
+    ci.city_name,
+    p.product_name,
+    COUNT(DISTINCT c.customer_name)
+        AS distinct_customer
+FROM City ci
+LEFT JOIN Customer c
+    ON ci.city_id = c.city_id
+INNER JOIN Sales s
+    ON s.customer_id = c.customer_id
+INNER JOIN Product p
+    ON p.product_id = s.product_id
+WHERE p.product_name LIKE '%Coffee%'
+GROUP BY ci.city_name,
+         p.product_name;
+```
+
+---
+
+## Q8. Monthly Sales Growth Rate by City
+
+### Query
+
+```sql
+WITH CTE AS
+(
+    SELECT
+        ci.city_name,
+        YEAR(s.sale_date) AS years,
+        MONTH(s.sale_date) AS months,
+        SUM(s.total) AS total_sales
+    FROM City ci
+    INNER JOIN Customer c
+        ON ci.city_id = c.city_id
+    INNER JOIN Sales s
+        ON s.customer_id = c.customer_id
+    GROUP BY ci.city_name,
+             years,
+             months
+),
+
+Growth AS
+(
+    SELECT
+        city_name,
+        years,
+        months,
+        total_sales AS current_sales,
+        LAG(total_sales,1)
+        OVER
+        (
+            PARTITION BY city_name
+            ORDER BY years, months
+        ) AS previous_sales
+    FROM CTE
+)
+
+SELECT *,
+       ROUND(
+           ((current_sales - previous_sales)
+            / previous_sales) * 100,
+           2
+       ) AS growth_percentage
+FROM Growth
+WHERE previous_sales IS NOT NULL;
+```
+
+---
+
+## Q9. City Population vs Coffee Consumers
+
+### Query
+
+```sql
+SELECT
+    city_name,
+    population,
+    ROUND(population * 0.25)
+    AS estimated_coffee_consumers
+FROM City
+ORDER BY estimated_coffee_consumers DESC;
+```
+
+---
+
+## Q10. Average Sale vs Average Rent per Customer
+
+### Query
+
+```sql
+WITH Avg_sale_customer AS
+(
+    SELECT
+        ci.city_name,
+        SUM(s.total) /
+        COUNT(DISTINCT c.customer_name)
+        AS avg_sale_per_customer,
+        COUNT(DISTINCT c.customer_name)
+        AS total_customer
+    FROM Sales s
+    INNER JOIN Customer c
+        ON s.customer_id = c.customer_id
+    INNER JOIN City ci
+        ON ci.city_id = c.city_id
+    GROUP BY ci.city_name
+),
+
+Rent AS
+(
+    SELECT
+        city_name,
+        estimated_rent
+    FROM City
+)
+
+SELECT
+    avs.city_name,
+    avs.avg_sale_per_customer,
+    r.estimated_rent /
+    avs.total_customer
+    AS avg_rent_per_customer
+FROM Rent r
+JOIN Avg_sale_customer avs
+    ON r.city_name = avs.city_name
+ORDER BY avg_sale_per_customer DESC,
+         avg_rent_per_customer ASC;
+```
+
+---
+
+# SQL Concepts Used
+
+* Joins (INNER JOIN, LEFT JOIN)
+* Aggregate Functions (SUM, COUNT, AVG)
+* Window Functions (DENSE_RANK, LAG)
+* Common Table Expressions (CTEs)
+* Date Functions (YEAR, MONTH, QUARTER)
+* GROUP BY
+* ORDER BY
+* Filtering with WHERE
+
+---
+
+# Key Insights
+
+* Total Revenue: ₹6.07 Million+
+* Total Customers: 497
+* Delhi has the highest population.
+* Coffee consumer estimation highlights cities with strong market potential.
+* Top-selling products vary across cities.
+* Monthly growth analysis helps identify expanding and declining markets.
+* Revenue-per-customer and rent analysis assist in evaluating profitability and expansion opportunities.
+
+# Tools Used
+
+* MySQL
+* SQL
+* GitHub
+
+# Author
+
+Your Name
+
+
+
 
 ---
 
@@ -162,30 +551,15 @@ By implementing the recommended expansion strategy, Monday Coffee can:
 
 ---
 
-## 🚀 Future Enhancements
-
-* Customer Lifetime Value (CLV) Analysis
-* Store Location Optimization using GIS
-* Demand Forecasting
-* Market Basket Analysis
-* Customer Segmentation using Machine Learning
-
----
-
 ## 👨‍💻 Author
 
 **Amit Bhowate**
 
-Data Analyst | SQL Developer | Business Intelligence Enthusiast
+Data Analyst | Business Intelligence Enthusiast
 
-LinkedIn: [Your LinkedIn URL]
+LinkedIn: www.linkedin.com/in/amitbhowate98
 
-GitHub: [Your GitHub Profile]
 
----
 
-## 📜 License
-
-This project is intended for educational and portfolio purposes.
 
 
