@@ -1,3 +1,5 @@
+I analysed Monday coffee outlet data to understand which factor is usefull for business.
+
 # ☕ Monday Coffee Offline Expansion Analysis
 
 ## 📌 Project Overview
